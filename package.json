@@ -1,0 +1,25 @@
+{
+	"name": "@crm/plasma-monorepo",
+	"private": true,
+	"scripts": {
+		"build": "turbo run build",
+		"dev": "turbo run dev",
+		"lint": "turbo run lint",
+		"format": "biome format --write \"**/*.{ts,tsx,md}\"",
+		"check-types": "turbo run check-types",
+		"changeset": "changeset",
+		"changeset:version": "changeset version",
+		"release": "turbo run build && changeset publish"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "2.3.15",
+		"@changesets/changelog-github": "0.6.0",
+		"@changesets/cli": "2.30.0",
+		"turbo": "2.9.6",
+		"typescript": "5.9.3"
+	},
+	"packageManager": "pnpm@10.30.0",
+	"engines": {
+		"node": ">=20"
+	}
+}
