@@ -1,0 +1,184 @@
+---
+title: Examples
+description: Real-world usage examples for Plasma
+---
+
+### Server Function (TanStack Start)
+
+```ts twoslash
+// @filename: adapters.ts
+export const usersAdapter = (response: any) => response
+
+// @filename: client.ts
+import { createHttpClient } from '@crm/plasma'
+export const client = createHttpClient({ 
+    serverUrl: 'http://localhost:3000',   
+    routes: { 'get-users': { url: '/users', returns: [] as {id: string}[] } } 
+})
+
+// @filename: index.ts
+// ---cut---
+import { createServerFn } from '@tanstack/react-start'
+import { client } from './client'
+import { usersAdapter } from './adapters'
+
+export const getUsers = createServerFn().handler(async () => {
+  const [error, response] = await client.GET('get-users')
+
+  if (error) throw error
+
+  return usersAdapter(response)
+})
+```
+
+### File upload with `form-data`
+
+```ts twoslash
+// @filename: client.ts
+import { createHttpClient } from '@crm/plasma'
+export const client = createHttpClient({
+    serverUrl: 'http://localhost:3000',
+    routes: { 'upload-avatar': { url: '/upload' } } 
+})
+const formPayload = new FormData()
+
+// ---cut---
+const [error, result] = await client.POST('upload-avatar', formPayload, {
+  bodyType: 'form-data',
+})
+```
+
+### Public endpoint
+
+```ts twoslash
+// @filename: client.ts
+import { createHttpClient } from '@crm/plasma'
+import { z } from 'zod'
+export const client = createHttpClient({ 
+    serverUrl: 'http://localhost:3000', 
+    routes: { 
+        'login': { 
+            url: '/login', 
+            apiPayload: z.object({ email: z.string(), password: z.string() }) 
+        } 
+    } 
+})
+const credentials = { email: '', password: '' }
+
+// ---cut---
+const [error, session] = await client.POST('login', credentials, {
+  auth: false,
+})
+```
+
+### Advanced Usage
+
+```ts twoslash
+// @filename: utils/routes.ts
+import { z } from 'zod'
+export const VACATION_ROUTES = {
+  'upload-vacation': {
+    url: '/vacations',
+    clientInput: z.object({ segment: z.string().optional(), employeeWhoCovers: z.string().optional(), days: z.array(z.string()) }),
+    returns: {} as {
+            to: string;
+            email: string;
+            from: string;
+            action_type: string;
+            date: string;
+            id: string;
+        },
+  }
+} as const
+
+// @filename: utils/http.ts
+import { createHttpClient } from '@crm/plasma'
+import { VACATION_ROUTES } from './routes'
+export const vacationsClient = createHttpClient({
+    serverUrl: 'http://localhost:3000',
+    routes: VACATION_ROUTES,
+    adapter: <T> (data: any) => {
+        return {
+            status: Number(data?.Status),
+            data: data?.Data as T,
+            message: data?.Message as string
+        }
+    }
+})
+
+// @filename: lib/time.ts
+export const format = (date: any) => ''
+
+// @filename: constants/status.ts
+export const DATABASE_STATUS = { PENDING: 'PENDING' } as const
+
+// @filename: index.ts
+// ---cut---
+import { DATABASE_STATUS } from "./constants/status";
+import { createServerFn } from "@tanstack/react-start";
+import { ZodError } from "zod";
+import { format } from "./lib/time";
+import { vacationsClient } from "./utils/http";
+import { VACATION_ROUTES } from "./utils/routes";
+
+export const uploadVacation = createServerFn({ method: "POST" })
+    .inputValidator((data: FormData) => {
+        if (!(data instanceof FormData)) {
+            throw new Error("Expected FormData");
+        }
+
+        const segment = data.get("segment")?.toString().split(" - ")[0];
+
+        const payload = {
+            segment,
+            employeeWhoCovers: data.get("employee-who-covers") || undefined,
+            days: data.getAll("days"),
+        };
+
+        return VACATION_ROUTES["upload-vacation"].clientInput.parse(payload);
+    })
+    .handler(async ({ data: { days, segment, employeeWhoCovers } }) => {
+        const requestDate = new Date();
+        const thisYear = new Date().getFullYear();
+
+        const requestYear = `${thisYear}-12-31` as const;
+
+        const requestData = {
+            fechaSolicitud: requestDate,
+            numDias: days.length,
+            estatusVacacion: DATABASE_STATUS.PENDING,
+            observaciones: "-",
+            segmento: segment,
+            fk_cubre: employeeWhoCovers,
+            anio_solicitud: requestYear,
+            diasVacaciones: days.map((date: any) => format(date)).toString(),
+        };
+
+        const [error, response] = await vacationsClient.POST("upload-vacation", requestData, {
+            bodyType: "form-data",
+        });
+
+        if (error) {
+            if (error instanceof ZodError) {
+                return {
+                    success: false,
+                    error: "Invalid payload data",
+                    code: "",
+                };
+            }
+
+            throw error;
+        }
+
+        if (response.status !== 201) {
+            return {
+                success: false,
+                error: "No se pudieron procesar las vacaciones. Intenta más tarde.",
+            };
+        }
+
+        return {
+            success: true,
+        };
+    });
+```

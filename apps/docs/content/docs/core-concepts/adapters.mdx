@@ -1,0 +1,32 @@
+---
+title: Adapters
+description: Transform the raw API response before it reaches your application
+---
+
+An adapter transforms the raw API response before it reaches your application.
+
+```ts twoslash
+// @filename: routes.ts
+import type { ServerRoutes } from '@crm/plasma'
+
+export const APP_ROUTES = {
+  'get-users': {
+    url: '/api/users',
+    returns: {} as { data: { id: number; name: string }[] },
+  },
+} satisfies ServerRoutes
+
+// @filename: client.ts
+// ---cut---
+import { createHttpClient } from '@crm/plasma'
+import { APP_ROUTES } from './routes'
+
+export const client = createHttpClient({
+  serverUrl: process.env.API_URL,
+  routes: APP_ROUTES,
+  // API returns { data: [...] } — adapter extracts the array
+  adapter: (response) => response.data,
+})
+```
+
+When an adapter is provided, the `data` field of the result tuple is typed as the adapter's return type, not the raw `returns` type.

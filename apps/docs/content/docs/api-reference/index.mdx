@@ -1,0 +1,80 @@
+---
+title: API Reference
+description: Methods and options for Plasma HTTP client
+---
+
+### `createHttpClient(config)`
+
+Creates a typed HTTP client.
+
+| Option | Type | Description |
+|---|---|---|
+| `serverUrl` | `string \| undefined` | Base URL for your API |
+| `routes` | `ServerRoutes` | Route definitions object |
+| `adapter` | `(data: any) => any` | (Optional) Transform the response body |
+| `interceptors` | `Interceptors` | (Optional) Request/response interceptors |
+
+### `client.GET(alias[, options])`
+
+- **`options` is omittable** when the route has no `params` schema
+- **`options` is required** (and must include `params`) when the route defines a `params: z.object(...)` schema
+
+```ts twoslash
+// @filename: routes.ts
+import type { ServerRoutes } from '@crm/plasma'
+import { z } from 'zod'
+
+export const APP_ROUTES = {
+  'get-users': {
+    url: '/api/users',
+    params: z.object({
+      page: z.coerce.number().optional(),
+      role: z.enum(['admin', 'user']).optional(),
+    }),
+    returns: {} as { id: number; name: string }[],
+  },
+  'get-profile': {
+    url: '/api/profile',
+    returns: {} as { name: string },
+  }
+} satisfies ServerRoutes
+
+// @filename: client.ts
+import { createHttpClient } from '@crm/plasma'
+import { APP_ROUTES } from './routes'
+export const client = createHttpClient({ serverUrl: 'http://localhost', routes: APP_ROUTES })
+
+// ---cut---
+// Route defines `params: z.object(...)` — options is required
+const [error, users] = await client.GET('get-users', {
+  params: { page: 1, role: 'admin' }, // required
+  auth: true,                          // optional, default: true
+})
+
+// Route has no `params` schema — second argument can be omitted entirely
+const [err2, profile] = await client.GET('get-profile')
+
+// Or pass options to override auth when no params are needed
+const [err3, profile2] = await client.GET('get-profile', { auth: false })
+```
+
+| Property | Required | Type | Default | Description |
+|---|---|---|---|---|
+| `params` | When route defines a `params` schema | `z.infer<Route["params"]>` | — | Query parameters, validated and coerced by the route's Zod schema |
+| `auth` | No | `boolean` | `true` | Whether to enforce the `Authorization` header |
+
+### `client.POST(alias, body[, options])`
+
+If the route defines an `apiPayload` schema, the body is **validated and coerced** before being sent. Invalid data returns `[ZodError, null]` without making a network request.
+
+**Options (all optional):**
+
+| Property | Required | Type | Default | Description |
+|---|---|---|---|---|
+| `params` | No | `object` | — | Query parameters appended to the URL |
+| `bodyType` | No | `'json' \| 'form-data'` | `'json'` | Serialization format |
+| `auth` | No | `boolean` | `true` | Whether to enforce the `Authorization` header |
+
+### `client.PATCH(alias, body[, options])`
+
+Identical signature to `client.POST`. Use for partial update requests.

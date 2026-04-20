@@ -1,0 +1,90 @@
+---
+title: Route Definitions
+description: Learn how to define routes in Plasma
+---
+
+Routes are plain objects that satisfy the `ServerRoutes` type and can be consumed by `createHttpClient`.
+
+| Field | Type | Description |
+|---|---|---|
+| `url` | `` `/${string}` `` | Endpoint path (must start with `/`) |
+| `params` | `z.ZodObject` | Query parameters schema — enables validation and coercion |
+| `apiPayload` | `z.ZodObject` | Request body schema — validated before the request is sent |
+| `clientInput` | `z.ZodObject` | Input schema for the UI layer (e.g. form validation) — not sent to the API |
+| `returns` | `unknown` | Shape of the API response (type-only, not runtime) |
+
+## Example
+
+```ts twoslash title='routes.ts'
+import type { ServerRoutes } from '@crm/plasma'
+import { z } from 'zod'
+
+const USERS_ROUTES = {
+    "get-users": {
+        url: `/api/users`,
+        params: z.object({
+            page: z.coerce.number().positive(),
+            limit: z.coerce.number().positive(),
+        }),
+        returns: {} as { id: number; name: string }[]
+    },
+    "get-profile": {
+        url: `/api/users/profile`,
+        returns: {} as { id: number; name: string }
+    },
+    "create-user": {
+        url: `/api/users`,
+        apiPayload: z.object({
+            name: z.string(),
+            email: z.string(),
+        }),
+        returns: {} as { id: number; name: string }
+    }
+} satisfies ServerRoutes
+```
+
+```ts twoslash title='service.ts'
+// @filename: routes.ts
+import type { ServerRoutes } from '@crm/plasma'
+import { z } from 'zod'
+
+export const USERS_ROUTES = {
+    "get-users": {
+        url: `/api/users`,
+        params: z.object({
+            page: z.coerce.number().positive(),
+            limit: z.coerce.number().positive(),
+        }),
+        returns: {} as { id: number; name: string }[]
+    },
+    "get-profile": {
+        url: `/api/users/profile`,
+        returns: {} as { id: number; name: string }
+    },
+    "create-user": {
+        url: `/api/users`,
+        apiPayload: z.object({
+            name: z.string(),
+            email: z.string(),
+        }),
+        returns: {} as { id: number; name: string }
+    }
+} satisfies ServerRoutes
+
+// @filename: client.ts
+import { createHttpClient } from "@crm/plasma";
+import { USERS_ROUTES } from "./routes";
+
+export const client = createHttpClient({
+    serverUrl: 'http://localhost',
+    routes: USERS_ROUTES,
+});
+
+// @filename: service.ts
+// ---cut---
+import { client } from "./client";
+
+// @noErrors
+const [error, user] = await client.GET("");
+//                                      ^|
+```

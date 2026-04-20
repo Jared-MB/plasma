@@ -1,0 +1,40 @@
+---
+title: Authentication
+description: Managing authentication headers
+---
+
+All routes are **protected by default**. The client verifies that an `Authorization` header is present after request interceptors run.
+
+```ts twoslash
+// @filename: routes.ts
+import type { ServerRoutes } from '@crm/plasma'
+import { z } from 'zod'
+
+export const APP_ROUTES = {
+  'get-users': {
+    url: '/api/users',
+    returns: {} as { id: number; name: string }[],
+  },
+  'login': {
+    url: '/api/login',
+    apiPayload: z.object({ email: z.string(), password: z.string() }),
+    returns: {} as { token: string },
+  }
+} satisfies ServerRoutes
+
+// @filename: client.ts
+import { createHttpClient } from '@crm/plasma'
+import { APP_ROUTES } from './routes'
+export const client = createHttpClient({ serverUrl: 'http://localhost', routes: APP_ROUTES })
+const credentials = { email: 'a@b.com', password: 'password' }
+
+// ---cut---
+// Protected (default) — interceptors must attach the Authorization header
+const [error, data] = await client.GET('get-users')
+
+// Public — skips the Authorization check entirely
+const [error2, data2] = await client.POST('login', credentials, { auth: false })
+```
+
+> [!CAUTION]
+> If `auth` is `true` (the default) and no `Authorization` header is present after interceptors run, the client **throws synchronously** — it does not return an error tuple.

@@ -1,0 +1,139 @@
+---
+title: Quick Start
+description: Learn how to use Plasma in your project
+---
+
+### 1. Define your routes
+
+Create a `routes.ts` file describing your API endpoints. Use `z.object()` for any query parameters that need validation or coercion.
+
+```typescript title="routes.ts"
+import type { ServerRoutes } from '@crm/plasma'
+import { z } from 'zod'
+
+export const APP_ROUTES = {
+  'get-users': {
+    url: '/api/users',
+    params: z.object({
+      page: z.coerce.number().optional(),
+      role: z.enum(['admin', 'user']).optional(),
+    }),
+    returns: {} as { id: number; name: string }[],
+  },
+  'create-user': {
+    url: '/api/users',
+    apiPayload: z.object({
+      name: z.string(),
+      email: z.string().email(),
+    }),
+    returns: {} as { id: number; name: string; email: string },
+  },
+} satisfies ServerRoutes
+```
+
+### 2. Create the client
+
+Instantiate `createHttpClient` once and export it for use across your app or create separate clients for different purposes.
+
+```typescript twoslash title="client.ts"
+// @filename: routes.ts
+import type { ServerRoutes } from '@crm/plasma'
+import { z } from 'zod'
+
+export const APP_ROUTES = {
+  'get-users': {
+    url: '/api/users',
+    params: z.object({
+      page: z.coerce.number().optional(),
+      role: z.enum(['admin', 'user']).optional(),
+    }),
+    returns: {} as { id: number; name: string }[],
+  },
+  'create-user': {
+    url: '/api/users',
+    apiPayload: z.object({
+      name: z.string(),
+      email: z.string().email(),
+    }),
+    returns: {} as { id: number; name: string; email: string },
+  },
+} satisfies ServerRoutes
+
+// @filename: client.ts
+// ---cut---
+import { createHttpClient } from '@crm/plasma'
+import { APP_ROUTES } from './routes'
+
+export const client = createHttpClient({
+  serverUrl: process.env.API_URL,
+  routes: APP_ROUTES,
+  interceptors: {
+    request: [
+      async (req) => {
+        const token = localStorage.getItem('token')
+        if (token) req.headers.set('Authorization', `Bearer ${token}`)
+        return req
+      },
+    ],
+  },
+})
+```
+
+### 3. Make requests
+
+All methods return a Go-style `[error, data]` tuple — no try/catch needed.
+
+```ts twoslash
+// @filename: routes.ts
+import type { ServerRoutes } from '@crm/plasma'
+import { z } from 'zod'
+
+export const APP_ROUTES = {
+  'get-users': {
+    url: '/api/users',
+    params: z.object({
+      page: z.coerce.number().optional(),
+      role: z.enum(['admin', 'user']).optional(),
+    }),
+    returns: {} as { id: number; name: string }[],
+  },
+  'create-user': {
+    url: '/api/users',
+    apiPayload: z.object({
+      name: z.string(),
+      email: z.string().email(),
+    }),
+    returns: {} as { id: number; name: string; email: string },
+  },
+} satisfies ServerRoutes
+
+// @filename: client.ts
+import { createHttpClient } from '@crm/plasma'
+import { APP_ROUTES } from './routes'
+
+export const client = createHttpClient({
+  serverUrl: process.env.API_URL,
+  routes: APP_ROUTES,
+  interceptors: {
+    request: [
+      async (req) => {
+        const token = localStorage.getItem('token')
+        if (token) req.headers.set('Authorization', `Bearer ${token}`)
+        return req
+      },
+    ],
+  },
+})
+// ---cut---
+const [error, users] = await client.GET('get-users', {
+//                                      ^^^^^^^^^^^
+  params: { page: 1, role: 'admin' },
+})
+
+if (error) {
+  console.error(error)
+  throw error
+}
+
+console.log(users)
+```

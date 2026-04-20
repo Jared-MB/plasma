@@ -1,0 +1,42 @@
+---
+title: Error Handling
+description: How errors are handled in Plasma
+---
+
+Every method returns a `readonly [Error, null] | readonly [null, T]` tuple.
+
+```ts twoslash
+// @filename: routes.ts
+import type { ServerRoutes } from '@crm/plasma'
+
+export const APP_ROUTES = {
+  'get-users': {
+    url: '/api/users',
+    returns: {} as { id: number; name: string }[],
+  },
+} satisfies ServerRoutes
+
+// @filename: client.ts
+import { createHttpClient } from '@crm/plasma'
+import { APP_ROUTES } from './routes'
+export const client = createHttpClient({ serverUrl: 'http://localhost', routes: APP_ROUTES })
+export const handleError = (e: Error) => {}
+
+// ---cut---
+const [error, data] = await client.GET('get-users')
+
+// @noErrors
+if (error) return handleError(error)
+// data is fully typed and non-null here
+console.log(data)
+```
+
+Errors are **returned** (not thrown) for:
+- Network failures
+- Non-2xx HTTP responses
+- JSON parse failures
+- `apiPayload` Zod validation failures
+
+Errors are **thrown** for:
+- Missing `serverUrl`
+- Missing `Authorization` header on a protected route

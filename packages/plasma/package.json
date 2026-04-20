@@ -6,13 +6,13 @@
 		"access": "public"
 	},
 	"type": "module",
-	"main": "./dist/index.js",
-	"types": "./dist/index.d.ts",
+	"main": "./dist/index.mjs",
+	"types": "./dist/index.d.mts",
 	"exports": {
 		".": {
-			"types": "./dist/index.d.ts",
-			"import": "./dist/index.js",
-			"default": "./dist/index.js"
+			"types": "./dist/index.d.mts",
+			"import": "./dist/index.mjs",
+			"default": "./dist/index.mjs"
 		}
 	},
 	"scripts": {
@@ -23,9 +23,10 @@
 	},
 	"devDependencies": {
 		"@biomejs/biome": "2.3.15",
+		"tsdown": "0.21.9",
 		"typescript": "5.9.3",
 		"vitest": "4.0.18",
-		"tsdown": "0.21.9"
+		"zod": "^4.3.6"
 	},
 	"dependencies": {
 		"@kristall/try-catch": "2.0.0",

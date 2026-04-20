@@ -1,0 +1,109 @@
+---
+title: Interceptors
+description: Hook into the request and response lifecycle
+---
+
+Interceptors are async functions that run before the request is sent (request) or after the response is received (response). Both sync and async are supported, and they execute **in order** — each one receives the output of the previous.
+
+### Request Interceptors
+
+```typescript
+type RequestInterceptor = (request: HttpRequest, context: HttpRequest) => HttpRequest | Promise<HttpRequest>
+```
+
+- **`request`** — the current request state (may already be modified by a previous interceptor)
+- **`context`** — a snapshot of the original request before any interceptors ran; useful for logging or error correlation
+
+```ts twoslash
+import type { RequestInterceptor } from '@crm/plasma'
+
+const authInterceptor: RequestInterceptor = async (request, context) => {
+  const token = localStorage.getItem('token')
+  if (token) request.headers.set('Authorization', `Bearer ${token}`)
+  return request
+}
+```
+
+The `HttpRequest` shape:
+
+| Property | Type | Description |
+|---|---|---|
+| `url` | `string` | Full resolved URL (serverUrl + path + query) |
+| `method` | `'GET' \| 'POST' \| 'PATCH' \| 'PUT' \| 'DELETE'` | HTTP method |
+| `headers` | `Headers` | Mutable headers object |
+| `body` | `BodyInit \| null \| undefined` | Serialized request body |
+
+### Response Interceptors
+
+```typescript
+type ResponseInterceptor = (response: Response, context: HttpRequest) => Response | Promise<Response>
+```
+
+- **`response`** — the current response (may have been modified by a previous interceptor)
+- **`context`** — the original `HttpRequest` that generated this response; useful for logging, retries, or redirects
+
+```ts twoslash
+import type { ResponseInterceptor } from '@crm/plasma'
+
+const unauthorizedInterceptor: ResponseInterceptor = async (response, context) => {
+  if (response.status === 401) {
+    console.warn(`Unauthorized on ${context.method} ${context.url}`)
+    localStorage.removeItem('token')
+    window.location.href = '/login'
+  }
+  return response
+}
+```
+
+Use the `context` parameter to act on the original request inside a response interceptor. The following example logs and redirects forbidden access attempts:
+
+```typescript
+import type { ResponseInterceptor } from "@crm/plasma";
+import { redirect } from "@tanstack/react-router";
+import { getUserProfile } from "@/core/users/services/get-user-profile";
+
+export const forbiddenInterceptor: ResponseInterceptor = async (response, context) => {
+    if (response.status === 403) {
+        const user = await getUserProfile({ data: { userId: "" } });
+
+        console.warn(
+            `User **${user.name}** with id **${user.id}** tried to access the resource [${context.method}] **${context.url}**. \nLogged out by forbidden interceptor.`,
+        );
+
+        throw redirect({
+            to: "/login",
+        });
+    }
+
+    return response;
+};
+``` 
+
+### Wiring interceptors
+
+```ts twoslash
+// @filename: routes.ts
+import type { ServerRoutes } from '@crm/plasma'
+export const APP_ROUTES = {} satisfies ServerRoutes
+
+// @filename: interceptors.ts
+import type { RequestInterceptor, ResponseInterceptor } from '@crm/plasma'
+export const authInterceptor: RequestInterceptor = (req) => req
+export const unauthorizedInterceptor: ResponseInterceptor = (res) => res
+export const forbiddenInterceptor: ResponseInterceptor = (res) => res
+
+// @filename: client.ts
+// ---cut---
+import { createHttpClient } from '@crm/plasma'
+import { APP_ROUTES } from './routes'
+import { authInterceptor, unauthorizedInterceptor, forbiddenInterceptor } from './interceptors'
+
+export const client = createHttpClient({
+  serverUrl: process.env.API_URL,
+  routes: APP_ROUTES,
+  interceptors: {
+    request: [authInterceptor],
+    response: [unauthorizedInterceptor, forbiddenInterceptor],
+  },
+})
+```
