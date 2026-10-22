@@ -354,7 +354,7 @@ import { vacationsClient } from "../utils/http";
 import { VACATION_ROUTES } from "../utils/routes";
 
 export const uploadVacation = createServerFn({ method: "POST" })
-    .inputValidator((data: FormData) => {
+    .validator((data: FormData) => {
         if (!(data instanceof FormData)) {
             throw new Error("Expected FormData");
         }

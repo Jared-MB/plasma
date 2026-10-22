@@ -9,7 +9,7 @@ export type Route = {
     /**
      * Data schema to be send from Client (UI) to Server Function
      *
-     * Mostly used in `.inputValidator()` server functions
+     * Mostly used in `.validator()` server functions
      */
     clientInput?: z.ZodType;
     /**
